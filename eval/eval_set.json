@@ -1,0 +1,62 @@
+[
+  {
+    "question": "员工手册中关于年假的规定是什么？",
+    "category": "fact_lookup",
+    "language": "cn",
+    "expect_rejection": false
+  },
+  {
+    "question": "What is the data retention policy?",
+    "category": "fact_lookup",
+    "language": "en",
+    "expect_rejection": false
+  },
+  {
+    "question": "合规指南中关于数据保护的主要条款有哪些？",
+    "category": "compliance",
+    "language": "cn",
+    "expect_rejection": false
+  },
+  {
+    "question": "What are the key requirements of GDPR Article 17?",
+    "category": "compliance",
+    "language": "en",
+    "expect_rejection": false
+  },
+  {
+    "question": "技术规范和员工手册中对'机密数据'的定义有什么不同？",
+    "category": "cross_doc",
+    "language": "cn",
+    "expect_rejection": false
+  },
+  {
+    "question": "How does the architecture document define microservice boundaries?",
+    "category": "cross_doc",
+    "language": "en",
+    "expect_rejection": false
+  },
+  {
+    "question": "马斯克的最新火箭发射计划是什么？",
+    "category": "rejection",
+    "language": "cn",
+    "expect_rejection": true
+  },
+  {
+    "question": "What is the weather forecast for tomorrow?",
+    "category": "rejection",
+    "language": "en",
+    "expect_rejection": true
+  },
+  {
+    "question": "公司对远程办公的政策是什么？",
+    "category": "fact_lookup",
+    "language": "cn",
+    "expect_rejection": false
+  },
+  {
+    "question": "数据泄露事故的上报流程是怎样的？",
+    "category": "compliance",
+    "language": "cn",
+    "expect_rejection": false
+  }
+]

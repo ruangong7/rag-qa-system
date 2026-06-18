@@ -1,0 +1,51 @@
+=== OCR EXTRACTED FROM SCANNED PDF: security_policy_scan.pdf ===
+
+# Information Security Policy / 信息安全政策 ISMS-2024
+
+## 1. Access Control / 访问控制
+
+### 1.1 Principle of Least Privilege / 最小权限原则
+Users shall be granted the minimum level of access necessary to perform their job functions.
+Access rights must be reviewed quarterly by department managers.
+用户应仅被授予执行工作职能所需的最低访问权限。
+访问权限必须由部门经理每季度审核一次。
+
+### 1.2 Account Lifecycle / 账号生命周期
+- Provisioning: New accounts created within 1 business day of approved request
+- Modification: Role changes applied within 4 hours
+- Deprovisioning: Accounts disabled within 1 hour of termination notice
+- Quarterly access review by managers required
+
+## 2. Incident Response / 事件响应
+
+### 2.1 Severity Classification / 严重性分类
+
+| Severity | Definition | Response Time | Escalation |
+|----------|------------|---------------|------------|
+| Critical | Data breach, system compromise | 15 minutes | CISO + CEO |
+| High | Malware detected, unauthorized access | 1 hour | CISO |
+| Medium | Suspicious activity, policy violation | 4 hours | Security Team Lead |
+| Low | Minor anomalies, routine alerts | 24 hours | On-call Engineer |
+
+### 2.2 Incident Response Playbook / 事件响应手册
+
+For Critical/High severity incidents:
+1. Declare incident and notify DBRT (Data Breach Response Team)
+2. Isolate affected systems (network segmentation or shutdown)
+3. Preserve evidence (disk images, logs, memory dumps)
+4. Perform root cause analysis
+5. Implement remediation
+6. Post-incident review within 5 business days
+
+## 3. Data Backup & Recovery / 数据备份与恢复
+
+### 3.1 Backup Policy / 备份策略
+- Full backup: Weekly (retained 90 days)
+- Incremental backup: Daily (retained 30 days)
+- Transaction logs: Continuous (retained 7 days)
+- Backups encrypted with AES-256 and stored in geographically separate locations
+
+### 3.2 Recovery Testing / 恢复测试
+Recovery drills must be conducted quarterly.
+RTO verification: Full system recovery within 4 hours.
+RPO verification: Maximum data loss not exceeding 15 minutes.
