@@ -1,4 +1,5 @@
 """Retrieval orchestrator: dense + sparse + RRF + optional rerank."""
+import logging
 import time
 from typing import List, Tuple, TYPE_CHECKING
 
@@ -6,6 +7,8 @@ if TYPE_CHECKING:
     from chromadb import Collection
 else:
     Collection = object
+
+logger = logging.getLogger(__name__)
 
 
 def retrieve(
@@ -42,7 +45,11 @@ def retrieve(
 
     if enable_rerank and len(fused) > rerank_top_k:
         t0 = time.time()
-        fused = rerank(query, fused, top_k=rerank_top_k)
+        try:
+            fused = rerank(query, fused, top_k=rerank_top_k)
+        except Exception as exc:
+            logger.warning("rerank failed, falling back to RRF order: %s", exc)
+            fused = fused[:rerank_top_k]
         timing["rerank_ms"] = round((time.time() - t0) * 1000)
     else:
         fused = fused[:rerank_top_k]

@@ -12,9 +12,7 @@ const el = {
   docCount: document.getElementById("docCount"),
   requestMeta: document.getElementById("requestMeta"),
   errorBanner: document.getElementById("errorBanner"),
-  answerEmpty: document.getElementById("answerEmpty"),
-  answerBlock: document.getElementById("answerBlock"),
-  answerText: document.getElementById("answerText"),
+  messageList: document.getElementById("messageList"),
   confidencePill: document.getElementById("confidencePill"),
   latencyPill: document.getElementById("latencyPill"),
   citationsEmpty: document.getElementById("citationsEmpty"),
@@ -26,7 +24,7 @@ const el = {
 function setLoading(loading) {
   state.loading = loading;
   el.sendBtn.disabled = loading;
-  el.sendBtn.textContent = loading ? "Sending" : "Send";
+  el.sendBtn.textContent = loading ? "发送中" : "发送";
 }
 
 function setSessionId(sessionId) {
@@ -44,6 +42,64 @@ function showError(message) {
   el.errorBanner.classList.remove("hidden");
 }
 
+function resetInspector() {
+  el.confidencePill.textContent = "Confidence -";
+  el.latencyPill.textContent = "Latency -";
+  el.citationsList.innerHTML = "";
+  el.contextsList.innerHTML = "";
+  el.citationsEmpty.classList.remove("hidden");
+  el.contextsEmpty.classList.remove("hidden");
+  el.citationsList.classList.add("hidden");
+  el.contextsList.classList.add("hidden");
+}
+
+function clearMessages() {
+  el.messageList.innerHTML = `
+    <div class="welcome-card">
+      <h3>开始提问</h3>
+      <p>支持中英文问题、多轮会话、引用答案和检索证据查看。</p>
+    </div>
+  `;
+}
+
+function scrollMessagesToBottom() {
+  el.messageList.scrollTop = el.messageList.scrollHeight;
+}
+
+function appendMessage(role, title, body, meta = []) {
+  const row = document.createElement("div");
+  row.className = `message-row ${role}`;
+
+  const card = document.createElement("article");
+  card.className = "message-card";
+
+  const roleNode = document.createElement("div");
+  roleNode.className = "message-role";
+  roleNode.textContent = title;
+
+  const bodyNode = document.createElement("pre");
+  bodyNode.className = "message-body";
+  bodyNode.textContent = body;
+
+  card.append(roleNode, bodyNode);
+
+  if (meta.length) {
+    const metaWrap = document.createElement("div");
+    metaWrap.className = "message-meta";
+    meta.forEach((item) => {
+      const pill = document.createElement("span");
+      pill.className = "mini-pill";
+      pill.textContent = item;
+      metaWrap.appendChild(pill);
+    });
+    card.appendChild(metaWrap);
+  }
+
+  row.appendChild(card);
+  el.messageList.appendChild(row);
+  scrollMessagesToBottom();
+}
+
 function createCard(title, meta, body) {
   const card = document.createElement("article");
   card.className = "card";
@@ -59,27 +115,25 @@ function createCard(title, meta, body) {
   metaNode.className = "card-meta";
   metaNode.textContent = meta;
 
-  head.append(titleNode, metaNode);
-
   const bodyNode = document.createElement("pre");
   bodyNode.className = "snippet";
   bodyNode.textContent = body;
 
+  head.append(titleNode, metaNode);
   card.append(head, bodyNode);
   return card;
 }
 
-function renderAnswer(data) {
-  el.answerEmpty.classList.add("hidden");
-  el.answerBlock.classList.remove("hidden");
-  el.answerText.textContent = data.answer || "";
+function renderInspector(data) {
   el.confidencePill.textContent = `Confidence ${data.confidence ?? "-"}`;
   el.latencyPill.textContent = `Latency ${data.latency_ms ?? "-"} ms`;
+  renderCitations(data.citations || []);
+  renderContexts(data.retrieved_contexts || []);
 }
 
 function renderCitations(citations) {
   el.citationsList.innerHTML = "";
-  if (!citations || citations.length === 0) {
+  if (!citations.length) {
     el.citationsEmpty.classList.remove("hidden");
     el.citationsList.classList.add("hidden");
     return;
@@ -95,7 +149,7 @@ function renderCitations(citations) {
 
 function renderContexts(contexts) {
   el.contextsList.innerHTML = "";
-  if (!contexts || contexts.length === 0) {
+  if (!contexts.length) {
     el.contextsEmpty.classList.remove("hidden");
     el.contextsList.classList.add("hidden");
     return;
@@ -109,28 +163,13 @@ function renderContexts(contexts) {
   });
 }
 
-function resetResult() {
-  el.answerEmpty.classList.remove("hidden");
-  el.answerBlock.classList.add("hidden");
-  el.answerText.textContent = "";
-  el.citationsList.innerHTML = "";
-  el.contextsList.innerHTML = "";
-  el.citationsEmpty.classList.remove("hidden");
-  el.citationsList.classList.add("hidden");
-  el.contextsEmpty.classList.remove("hidden");
-  el.contextsList.classList.add("hidden");
-}
-
 async function loadHealth() {
   try {
     const resp = await fetch("/health");
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
-    }
     const data = await resp.json();
     el.healthStatus.textContent = data.status || "ok";
     el.docCount.textContent = String(data.documents_indexed ?? "-");
-  } catch (err) {
+  } catch {
     el.healthStatus.textContent = "Unavailable";
     el.docCount.textContent = "-";
   }
@@ -143,6 +182,8 @@ async function sendQuestion() {
   }
 
   showError("");
+  appendMessage("user", "你", question);
+  el.questionInput.value = "";
   setLoading(true);
   el.requestMeta.textContent = "Requesting";
 
@@ -162,12 +203,16 @@ async function sendQuestion() {
     }
 
     setSessionId(data.session_id);
-    renderAnswer(data);
-    renderCitations(data.citations || []);
-    renderContexts(data.retrieved_contexts || []);
+    appendMessage("assistant", "Assistant", data.answer || "", [
+      `confidence ${data.confidence ?? "-"}`,
+      `${data.latency_ms ?? "-"} ms`,
+      `citations ${(data.citations || []).length}`,
+    ]);
+    renderInspector(data);
     el.requestMeta.textContent = `Done · ${data.latency_ms ?? "-"} ms`;
   } catch (err) {
     showError(err.message || "Request failed");
+    appendMessage("assistant", "Assistant", "请求失败，请检查服务状态后重试。");
     el.requestMeta.textContent = "Failed";
   } finally {
     setLoading(false);
@@ -187,9 +232,11 @@ function bindEvents() {
   el.sendBtn.addEventListener("click", sendQuestion);
   el.newSessionBtn.addEventListener("click", () => {
     setSessionId("");
-    resetResult();
+    clearMessages();
+    resetInspector();
     showError("");
     el.requestMeta.textContent = "Ready";
+    el.questionInput.focus();
   });
   el.questionInput.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -199,9 +246,10 @@ function bindEvents() {
 }
 
 async function init() {
+  clearMessages();
+  resetInspector();
   bindExamples();
   bindEvents();
-  resetResult();
   await loadHealth();
 }
 

@@ -1,7 +1,26 @@
 """OpenAI-compatible LLM helpers."""
+import json
+import logging
+import time
 from typing import List, Optional
 
 from openai import OpenAI
+
+logger = logging.getLogger("rag-qa.llm")
+
+
+def _log_llm_call(call_type: str, model: str, started_at: float, usage=None, **extra):
+    entry = {
+        "event": "llm.call",
+        "call_type": call_type,
+        "model": model,
+        "latency_ms": round((time.time() - started_at) * 1000, 2),
+        "prompt_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
+        "completion_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
+        "total_tokens": getattr(usage, "total_tokens", 0) if usage else 0,
+        **extra,
+    }
+    logger.info(json.dumps(entry, ensure_ascii=False))
 
 
 def get_llm_client(api_key: str, base_url: Optional[str] = None) -> OpenAI:
@@ -41,6 +60,7 @@ def generate_answer(
     max_tokens: int = 1024,
 ) -> dict:
     context_text = _format_contexts(contexts)
+    started_at = time.time()
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -55,6 +75,15 @@ def generate_answer(
     )
     answer = response.choices[0].message.content or ""
     usage = response.usage
+    _log_llm_call(
+        "generate_answer",
+        model,
+        started_at,
+        usage=usage,
+        context_count=len(contexts),
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
     return {
         "answer": answer.strip(),
         "input_tokens": getattr(usage, "prompt_tokens", 0),
@@ -76,6 +105,7 @@ def rewrite_query(client: OpenAI, model: str, history: List[dict], current_query
         f"Current question: {current_query}\n\n"
         "Rewritten query:"
     )
+    started_at = time.time()
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
@@ -83,4 +113,12 @@ def rewrite_query(client: OpenAI, model: str, history: List[dict], current_query
         max_tokens=200,
     )
     rewritten = response.choices[0].message.content or ""
+    _log_llm_call(
+        "rewrite_query",
+        model,
+        started_at,
+        usage=response.usage,
+        history_messages=len(history),
+        max_tokens=200,
+    )
     return rewritten.strip() or current_query

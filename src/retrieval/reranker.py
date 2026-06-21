@@ -23,18 +23,21 @@ def _get_reranker():
         model_name = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
         device = os.getenv("RERANKER_DEVICE", "cpu").lower()
         use_fp16 = _env_bool("RERANKER_USE_FP16", device.startswith("cuda"))
+        local_files_only = os.getenv("HF_HUB_OFFLINE") == "1" or os.getenv("TRANSFORMERS_OFFLINE") == "1"
         if device == "cpu":
             use_fp16 = False
 
         logger.info(
-            "Loading reranker model=%s device=%s use_fp16=%s",
+            "Loading reranker model=%s device=%s use_fp16=%s local_files_only=%s",
             model_name,
             device,
             use_fp16,
+            local_files_only,
         )
         _reranker = FlagReranker(
             model_name,
             use_fp16=use_fp16,
+            local_files_only=local_files_only,
         )
     return _reranker
 

@@ -1,5 +1,6 @@
-"""Dense retrieval - BGE-M3 + ChromaDB"""
+"""Dense retrieval - BGE-M3 + ChromaDB."""
 import logging
+import os
 from typing import List
 from chromadb import Collection
 
@@ -12,8 +13,21 @@ def _get_model():
     global _embedding_model
     if _embedding_model is None:
         from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer("BAAI/bge-m3")
+        model_name = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+        local_files_only = os.getenv("HF_HUB_OFFLINE") == "1" or os.getenv("TRANSFORMERS_OFFLINE") == "1"
+        device = os.getenv("EMBEDDING_DEVICE", "cpu")
+        _embedding_model = SentenceTransformer(
+            model_name,
+            local_files_only=local_files_only,
+            device=device,
+        )
     return _embedding_model
+
+
+def warmup_dense_model():
+    model = _get_model()
+    model.encode(["warmup"], normalize_embeddings=True, show_progress_bar=False)
+    return True
 
 
 def dense_search(

@@ -19,6 +19,7 @@ from src.ingestion.indexer import get_collection
 from src.observability.logger import RAGLogger
 from src.observability.trace import build_traceparent, parse_or_create_trace
 from src.retrieval import retrieve
+from src.retrieval.dense import warmup_dense_model
 from src.retrieval.sparse import build_bm25_index, load_bm25_index, save_bm25_index
 from src.safety import REJECTION_TEMPLATES, check_injection, mask_pii as mask_pii_input
 
@@ -107,6 +108,12 @@ async def lifespan(app: FastAPI):
         api_key=os.getenv("DASHSCOPE_API_KEY") or os.getenv("LLM_API_KEY"),
         base_url=os.getenv("LLM_BASE_URL"),
     )
+
+    if _env_bool("WARMUP_DENSE_ON_STARTUP", True):
+        try:
+            warmup_dense_model()
+        except Exception:
+            pass
     yield
 
 
@@ -320,9 +327,10 @@ async def chat(req: ChatRequest, request: Request, response: Response):
             )
         )
 
-    citation_coverage = cit_result["citations_found"] / max(cit_result["citations_total"], 1)
+    citation_coverage = min(cit_result["citations_found"] / max(cit_result["citations_total"], 1), 1.0)
     top_similarity = float(stages.get("top_similarity") or stages.get("dense_top_similarity") or 0.0)
-    confidence = round((citation_coverage + min(top_similarity, 1.0)) / 2, 2)
+    confidence = round((citation_coverage + min(max(top_similarity, 0.0), 1.0)) / 2, 2)
+    confidence = min(max(confidence, 0.0), 1.0)
     if not cit_result["valid"]:
         confidence = min(confidence, 0.35)
 
