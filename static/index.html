@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAG QA Demo</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>RAG QA Demo</h1>
+          <p>Qwen-Max + ChromaDB</p>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Session</h2>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Session ID</span>
+              <span id="sessionId" class="meta-value">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Health</span>
+              <span id="healthStatus" class="meta-value">Checking</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Documents</span>
+              <span id="docCount" class="meta-value">-</span>
+            </div>
+          </div>
+          <button id="newSessionBtn" class="secondary-btn" type="button">New Session</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Examples</h2>
+          </div>
+          <div class="example-list">
+            <button class="example-btn" type="button" data-question="员工手册中关于年假的规定是什么？">员工手册中关于年假的规定是什么？</button>
+            <button class="example-btn" type="button" data-question="What is the annual leave entitlement for junior employees?">What is the annual leave entitlement for junior employees?</button>
+            <button class="example-btn" type="button" data-question="数据泄露后需要在多久内通知监管机构？">数据泄露后需要在多久内通知监管机构？</button>
+            <button class="example-btn" type="button" data-question="How does the architecture document define the API gateway?">How does the architecture document define the API gateway?</button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <section class="chat-surface">
+          <div class="surface-head">
+            <div>
+              <h2>Ask</h2>
+              <p id="requestMeta" class="subtle">Ready</p>
+            </div>
+          </div>
+
+          <div class="composer">
+            <textarea id="questionInput" rows="5" placeholder="输入中文或英文问题"></textarea>
+            <div class="composer-actions">
+              <button id="sendBtn" class="primary-btn" type="button">Send</button>
+            </div>
+          </div>
+
+          <div id="errorBanner" class="error-banner hidden"></div>
+
+          <div class="result-grid">
+            <section class="result-panel answer-panel">
+              <div class="panel-head">
+                <h3>Answer</h3>
+              </div>
+              <div id="answerEmpty" class="empty-state">提交问题后，这里会显示答案。</div>
+              <div id="answerBlock" class="hidden">
+                <div class="answer-meta">
+                  <span id="confidencePill" class="pill">Confidence -</span>
+                  <span id="latencyPill" class="pill">Latency -</span>
+                </div>
+                <pre id="answerText" class="answer-text"></pre>
+              </div>
+            </section>
+
+            <section class="result-panel">
+              <div class="panel-head">
+                <h3>Citations</h3>
+              </div>
+              <div id="citationsEmpty" class="empty-state">暂无引用。</div>
+              <div id="citationsList" class="stack-list hidden"></div>
+            </section>
+          </div>
+
+          <section class="result-panel context-panel">
+            <div class="panel-head">
+              <h3>Retrieved Contexts</h3>
+            </div>
+            <div id="contextsEmpty" class="empty-state">暂无检索片段。</div>
+            <div id="contextsList" class="stack-list hidden"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

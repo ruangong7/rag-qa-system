@@ -1,16 +1,35 @@
-"""结构化日志 - JSON格式，面向 ELK/Grafana 消费"""
+"""Structured JSON logging for RAG requests."""
 import json
-import time
 import logging
+import os
+import time
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 
 class RAGLogger:
-    """结构化日志记录器"""
-
     def __init__(self, name: str = "rag-qa"):
         self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.DEBUG)
+        if self.logger.handlers:
+            return
+
+        self.logger.setLevel(getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO))
+        self.logger.propagate = False
+
+        formatter = logging.Formatter("%(message)s")
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        self.logger.addHandler(stream_handler)
+
+        if os.getenv("LOG_TO_FILE", "true").lower() in {"1", "true", "yes", "on"}:
+            log_dir = Path(os.getenv("LOG_DIR", "logs"))
+            log_dir.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(log_dir / os.getenv("LOG_FILE", "rag.jsonl"), encoding="utf-8")
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+
+    def _ts(self) -> str:
+        return time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
 
     def log_request(
         self,
@@ -23,15 +42,23 @@ class RAGLogger:
         tokens: Optional[dict] = None,
         rejection: bool = False,
         rejection_reason: str = "",
+        status: str = "ok",
+        trace_id: str = "",
+        span_id: str = "",
+        traceparent: str = "",
     ):
-        """记录完整请求日志"""
         entry = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "timestamp": self._ts(),
             "level": "INFO",
+            "event": "rag.request",
             "request_id": request_id,
             "session_id": session_id,
+            "status": status,
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "traceparent": traceparent,
             "query": query,
-            "answer": answer[:200] + "..." if len(answer) > 200 else answer,
+            "answer_preview": answer[:300],
             "total_latency_ms": round(total_latency_ms, 2),
             "tokens": tokens or {},
             "rejection": rejection,
@@ -40,24 +67,25 @@ class RAGLogger:
         }
         self.logger.info(json.dumps(entry, ensure_ascii=False))
 
-    def log_stage(self, request_id: str, stage: str, **kwargs):
-        """记录单个阶段"""
-        entry = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "level": "DEBUG",
-            "request_id": request_id,
-            "stage": stage,
-            **kwargs,
-        }
-        self.logger.debug(json.dumps(entry, ensure_ascii=False))
-
     def log_alert(self, request_id: str, message: str, **kwargs):
-        """告警日志"""
         entry = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "level": "WARN",
+            "timestamp": self._ts(),
+            "level": "WARNING",
+            "event": "rag.alert",
             "request_id": request_id,
             "message": message,
             **kwargs,
         }
         self.logger.warning(json.dumps(entry, ensure_ascii=False))
+
+    def log_error(self, request_id: str, message: str, exc: Exception, **kwargs):
+        entry = {
+            "timestamp": self._ts(),
+            "level": "ERROR",
+            "event": "rag.error",
+            "request_id": request_id,
+            "message": message,
+            "error": str(exc),
+            **kwargs,
+        }
+        self.logger.error(json.dumps(entry, ensure_ascii=False))
