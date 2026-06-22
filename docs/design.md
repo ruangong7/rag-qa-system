@@ -1,25 +1,13 @@
-# Design Notes — RAG QA System
+# Design Notes - RAG QA System
 
 ## 关键选择与权衡
 
-**1. BGE-M3 作为统一 Embedding 模型**
-选择原因：原生支持中英双语，单一模型同时产出 Dense (1024d) 和 Sparse 向量，无需分别部署 dense 和 BM25 模型。代价是模型较大（~2GB），冷启动约 2 秒。
+本系统采用本地可运行的 RAG 方案，目标是完成一个“基于内部知识库、可引用、可拒答”的问答 Demo，而不是开放式聊天产品。生成模型默认使用 DashScope OpenAI-compatible 接口接入的 `qwen-max`，原因是中文表现稳定、指令跟随较好，而且代码层只依赖 `api_key + base_url + model`，后续切换兼容模型成本低。代价是生成延迟和调用成本相对更高，因此系统增加了低置信拒答与引用校验，避免无依据生成。
 
-**2. Qdrant 替代 Elasticsearch**
-Qdrant 支持向量搜索 + 内置 BM25 稀疏索引，单二进制部署，运维成本远低于 ES。局限性：全文检索功能不如 ES 丰富，对复杂 query DSL 支持有限。当前场景（内部文档搜索）足够。
+向量检索模型选用 `BAAI/bge-m3`，原因是它对中英混合检索更稳，适合当前纯中文、纯英文和双语文档混合的知识库。向量库选择本地 `ChromaDB` 持久化，而不是纯内存索引或外部服务；这样部署简单、重启后无需重新向量化，但扩展性不如专门的分布式向量库。稀疏检索单独采用 `BM25`，并将索引保存为本地 `bm25.pkl`。
 
-**3. RRF 融合替代加权求和**
-Dense 和 Sparse 的分数量纲差异大（cosine ∈ [-1,1] vs BM25 无界），直接加权需调参且不稳定。RRF 只依赖排序位置，不需要分数归一化，实践更稳定。
+在线检索时，系统先执行 dense search 和 sparse search，再通过 `RRF` 做结果融合。选择 RRF 的原因是它只依赖排序位置，不要求对 cosine similarity 和 BM25 分数做额外归一化，比手工加权更稳。其代价是融合结果可解释性主要来自排名而不是统一分值。系统还提供可选的 `bge-reranker-v2-m3` 精排，但考虑到 CPU 环境下延迟明显增加，因此通过环境变量控制开关，而不是默认强制启用。
 
-**4. Cross-encoder Reranker 的必要性**
-初召 top-20 中可能包含语义相关但不精确的 chunk，Reranker 逐对精排后 top-5 质量显著提升。代价是额外 200-300ms 延迟，但仍在 10s 预算内。
+分块策略采用“按 Markdown 标题层级结构化分块，再对超长 section 二次切分”。这样可以保留 `doc_title`、`section_path`、`department` 等元数据，便于引用展示、日志审计和后续评估。当前主链路稳定支持 `.md` 和 `.txt`；仓库里虽保留 OCR / PDF 相关依赖与模块，但它们目前不属于稳定交付能力，因此文档中不将其作为当前核心能力承诺。
 
-**5. 结构日志选型 structlog**
-相比 print/标准 logging，structlog 产出 JSON 行，可直接消费到 ELK/Grafana，支持按 request_id、session_id 追踪全链路。零额外依赖。
-
-## 可发展性
-
-- 文档扩展：ingestion pipeline 支持增量索引，通过 chunk_hash 去重
-- 检索策略调整：config.yaml 集中管理参数，无需改代码
-- 质量迭代：eval/evaluate.py 自动化评估，每次变更后可对比指标
-- 日志增强：协议化 stage 字段，可插拔增加 tracing（OpenTelemetry）
+多轮对话采用短期记忆方案：默认保存在内存中，配置 `REDIS_URL` 后自动切到 Redis。若存在历史消息，系统会先调用一次 LLM 做 query rewrite，再进入检索和生成流程。这样比直接把整段历史塞给生成模型更可控，但多轮问答通常会比单轮多一次模型调用。评估方面，以 `RAGAS` 为主，重点使用 `faithfulness` 和 `context_precision_without_reference` 衡量答案是否忠于检索上下文；同时保留项目内自定义评估脚本，用于统计检索命中、引用命中、拒答率和延迟。
